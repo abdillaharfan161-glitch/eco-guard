@@ -1,0 +1,759 @@
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eco Guard - Jaga Lingkungan Kita</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Konfigurasi Tailwind Khusus -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'eco-main': '#2ecc71', // Hijau Daun
+                        'eco-light': '#82e0aa', // Hijau Lembut
+                        'eco-dark': '#27ae60', // Hijau Lebih Gelap
+                        'eco-bg': '#f7fdfb', // Latar belakang sangat ringan
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Gaya Kustom untuk PWA */
+        body {
+            background-color: #f7fdfb;
+            font-family: 'Inter', sans-serif;
+            color: #333;
+        }
+        .nav-link {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .nav-link.active {
+            border-bottom: 3px solid #2ecc71;
+            color: #2ecc71;
+            font-weight: 600;
+        }
+        .shadow-eco {
+            box-shadow: 0 4px 6px -1px rgba(46, 204, 113, 0.1), 0 2px 4px -1px rgba(46, 204, 113, 0.06);
+        }
+        /* Animasi Loading Daun Tumbuh */
+        .loading-leaf {
+            width: 50px;
+            height: 50px;
+            background-color: transparent;
+            border-radius: 50%;
+            border: 4px solid #2ecc71;
+            border-right-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        /* Map Custom Style */
+        #map {
+            height: 300px;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+        }
+        /* Dark Mode Styles */
+        .dark {
+            background-color: #1e293b;
+            color: #f1f5f9;
+        }
+        .dark .bg-white {
+            background-color: #334155;
+        }
+        .dark .text-gray-900 {
+            color: #f1f5f9;
+        }
+        .dark .text-gray-500 {
+            color: #cbd5e1;
+        }
+        .dark .border-gray-200 {
+            border-color: #475569;
+        }
+        .dark input, .dark textarea, .dark select {
+            background-color: #475569;
+            color: #f1f5f9;
+        }
+        /* Gaya Khusus untuk Output Gemini */
+        .gemini-output {
+            white-space: pre-wrap;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+    </style>
+    <!-- Manifest PWA (Tetap di sini meskipun Service Worker dihilangkan) -->
+    <link rel="manifest" href="/manifest.json">
+</head>
+<body class="min-h-screen transition-colors duration-300">
+
+    <!-- Konten Utama Aplikasi -->
+    <div id="app" class="max-w-xl mx-auto p-4 md:p-6 pb-20">
+
+        <!-- Header Aplikasi -->
+        <header class="flex justify-between items-center py-4 border-b border-gray-200 dark:border-gray-700">
+            <h1 class="text-3xl font-bold text-eco-dark flex items-center">
+                <span data-lucide="leaf" class="w-6 h-6 mr-2 text-eco-main"></span> Eco Guard
+            </h1>
+            <button id="darkModeToggle" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150" aria-label="Toggle Dark Mode">
+                <span data-lucide="moon" class="w-6 h-6 dark:text-yellow-400"></span>
+            </button>
+        </header>
+
+        <!-- Navigasi Tab -->
+        <nav class="sticky top-0 z-10 bg-eco-bg dark:bg-slate-800 transition-colors duration-300">
+            <div class="flex justify-around items-center pt-4 pb-2 text-gray-500 dark:text-gray-400">
+                <div id="nav-lapor" class="nav-link active text-eco-main py-2 px-4 flex flex-col items-center">
+                    <span data-lucide="megaphone" class="w-6 h-6"></span>
+                    <span class="text-xs mt-1">Lapor Cepat</span>
+                </div>
+                <div id="nav-edukasi" class="nav-link py-2 px-4 flex flex-col items-center">
+                    <span data-lucide="book-open-check" class="w-6 h-6"></span>
+                    <span class="text-xs mt-1">Edukasi</span>
+                </div>
+                <div id="nav-agenda" class="nav-link py-2 px-4 flex flex-col items-center">
+                    <span data-lucide="calendar-check" class="w-6 h-6"></span>
+                    <span class="text-xs mt-1">Agenda</span>
+                </div>
+                <div id="nav-riwayat" class="nav-link py-2 px-4 flex flex-col items-center">
+                    <span data-lucide="list-checks" class="w-6 h-6"></span>
+                    <span class="text-xs mt-1">Riwayat</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Area Konten Dinamis -->
+        <main id="content-area" class="mt-4">
+            <!-- Konten Lapor Cepat (Default) -->
+        </main>
+
+        <!-- Modal Notifikasi & Pesan -->
+        <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+            <div id="modal-content-wrapper" class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-sm shadow-2xl transition-all transform scale-100">
+                <h3 id="modal-title" class="text-xl font-bold mb-3 text-eco-dark dark:text-eco-light"></h3>
+                <div id="modal-message" class="text-gray-700 dark:text-gray-300 mb-4"></div>
+                <button onclick="closeModal()" class="w-full bg-eco-main text-white py-2 rounded-lg font-semibold hover:bg-eco-dark transition duration-150">Tutup</button>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-70 dark:bg-gray-900 dark:bg-opacity-80 flex items-center justify-center z-50 hidden">
+            <div class="flex flex-col items-center">
+                <div class="loading-leaf"></div>
+                <p class="mt-4 text-lg font-semibold text-eco-dark dark:text-eco-light">Memproses...</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Script Utama Aplikasi -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        const DB_NAME = 'EcoGuardDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'laporan';
+        let db;
+        let map;
+
+        const API_KEY = ""; // Kunci API Gemini - Dibiarkan kosong agar Canvas menyediakan saat runtime
+        const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
+        const MAX_RETRIES = 5;
+
+        // --- Fungsi Pembantu Gemini ---
+        async function callGemini(prompt, systemInstruction) {
+            let attempt = 0;
+            while (attempt < MAX_RETRIES) {
+                try {
+                    const payload = {
+                        contents: [{ parts: [{ text: prompt }] }],
+                        systemInstruction: { parts: [{ text: systemInstruction }] },
+                    };
+
+                    const response = await fetch(GEMINI_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.status === 429) {
+                        // Exponential backoff
+                        const delay = Math.pow(2, attempt) * 1000;
+                        console.warn(`Rate limit, retrying in ${delay}ms...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        attempt++;
+                        continue;
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(`API call failed with status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || 'Gagal menghasilkan konten.';
+                    return text;
+
+                } catch (error) {
+                    console.error("Gemini API Error:", error);
+                    attempt++;
+                    if (attempt >= MAX_RETRIES) {
+                        throw new Error("Gagal menghubungi Gemini API setelah beberapa kali percobaan.");
+                    }
+                    const delay = Math.pow(2, attempt) * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+
+        // --- 1. PWA & IndexedDB Setup ---
+
+        function initIndexedDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onerror = (event) => {
+                    console.error("Gagal membuka IndexedDB:", event.target.errorCode);
+                    reject('IndexedDB Error');
+                };
+
+                request.onsuccess = (event) => {
+                    db = event.target.result;
+                    console.log("IndexedDB berhasil dibuka.");
+                    resolve(db);
+                };
+
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        const objectStore = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                        objectStore.createIndex('status', 'status', { unique: false });
+                        console.log("Object Store 'laporan' dibuat.");
+                    }
+                };
+            });
+        }
+
+        async function saveReportToDB(report) {
+            if (!db) await initIndexedDB();
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.add(report);
+
+            return new Promise((resolve, reject) => {
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject('Gagal menyimpan laporan.');
+            });
+        }
+
+        async function getAllReports() {
+            if (!db) await initIndexedDB();
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.getAll();
+
+            return new Promise((resolve, reject) => {
+                request.onsuccess = (event) => resolve(event.target.result);
+                request.onerror = () => reject('Gagal mengambil laporan.');
+            });
+        }
+
+
+        // --- 2. UI and Navigation Functions ---
+
+        const contentArea = document.getElementById('content-area');
+        const navLinks = document.querySelectorAll('.nav-link');
+        const modalContainer = document.getElementById('modal-container');
+        const modalContentWrapper = document.getElementById('modal-content-wrapper');
+        const loadingOverlay = document.getElementById('loading-overlay');
+
+        function showLoading() { loadingOverlay.classList.remove('hidden'); }
+        function hideLoading() { loadingOverlay.classList.add('hidden'); }
+
+        function showModal(title, message, isHtml = false) {
+            document.getElementById('modal-title').textContent = title;
+            const messageElement = document.getElementById('modal-message');
+            if (isHtml) {
+                messageElement.innerHTML = message;
+            } else {
+                messageElement.textContent = message;
+            }
+            modalContentWrapper.classList.remove('max-w-sm'); // Lebarkan modal untuk konten Gemini
+            modalContentWrapper.classList.add('max-w-md');
+            modalContainer.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            modalContainer.classList.add('hidden');
+            modalContentWrapper.classList.add('max-w-sm');
+            modalContentWrapper.classList.remove('max-w-md');
+        }
+
+        function setActiveNav(activeId) {
+            navLinks.forEach(link => {
+                link.classList.remove('active', 'text-eco-main', 'font-semibold');
+                link.classList.add('text-gray-500', 'dark:text-gray-400');
+            });
+            const activeLink = document.getElementById(activeId);
+            activeLink.classList.add('active', 'text-eco-main', 'font-semibold');
+            activeLink.classList.remove('text-gray-500', 'dark:text-gray-400');
+        }
+
+        function renderLaporCepat() {
+            setActiveNav('nav-lapor');
+            contentArea.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-eco-light/30">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Laporkan Masalah Lingkungan</h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 flex items-center">
+                        <span data-lucide="map-pin" class="w-4 h-4 mr-1"></span> Lokasi saat ini: <span id="current-location" class="ml-1 font-medium">Mencari...</span>
+                    </p>
+                    <form id="reportForm" class="space-y-4">
+                        <div>
+                            <label for="jenis" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Jenis Laporan</label>
+                            <select id="jenis" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:border-gray-600 dark:focus:ring-eco-main dark:focus:border-eco-main">
+                                <option value="Sampah Liar">Sampah Liar</option>
+                                <option value="Polusi Udara">Polusi Udara/Asap</option>
+                                <option value="Kerusakan Fasilitas">Kerusakan Fasilitas Umum</option>
+                                <option value="Pencemaran Air">Pencemaran Air</option>
+                                <option value="Lainnya">Lainnya</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="deskripsi" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Deskripsi Singkat (Maks. 200 karakter)</label>
+                            <textarea id="deskripsi" rows="3" required maxlength="200" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:border-gray-600 dark:focus:ring-eco-main dark:focus:border-eco-main"></textarea>
+                        </div>
+                        <div>
+                            <label for="foto" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Ambil Foto (Opsional)</label>
+                            <input type="file" id="foto" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-eco-light file:text-eco-dark hover:file:bg-eco-main/70 hover:file:text-white transition duration-150"/>
+                        </div>
+                        <button type="submit" class="w-full bg-eco-main text-white py-3 rounded-xl font-bold text-lg hover:bg-eco-dark transition duration-200 flex items-center justify-center shadow-eco">
+                            <span data-lucide="send" class="w-5 h-5 mr-2"></span> Kirim Laporan
+                        </button>
+                    </form>
+                </div>
+
+                <div class="mt-8 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-eco-light/30">
+                    <h3 class="text-xl font-bold mb-3 text-gray-900 dark:text-white flex items-center">
+                        <span data-lucide="map" class="w-5 h-5 mr-2 text-eco-dark"></span> Peta Lokasi Laporan
+                    </h3>
+                    <div id="map"></div>
+                </div>
+            `;
+            lucide.createIcons(); // Re-render Lucide icons
+            setupReportForm();
+            initMap();
+        }
+
+        // Fungsi baru untuk memicu Analisis Laporan oleh Gemini
+        async function analyzeAndShowReport(jenis, deskripsi) {
+            showLoading();
+            const systemPrompt = "Anda adalah Asisten Lingkungan AI. Tugas Anda adalah menganalisis laporan masalah lingkungan dan memberikan Saran Aksi Cepat (1-2 langkah praktis yang bisa dilakukan pelapor) dan Potensi Dampak (1 paragraf singkat). Format output Anda harus menggunakan Markdown.";
+            const userPrompt = `Analisis laporan ini:\nJenis Masalah: ${jenis}\nDeskripsi: "${deskripsi}"`;
+
+            try {
+                const analysisResult = await callGemini(userPrompt, systemPrompt);
+                
+                const htmlContent = `
+                    <h3 class="text-xl font-bold mb-3 text-eco-dark dark:text-eco-light">Analisis Laporan Cepat ✨</h3>
+                    <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">Gemini AI telah menganalisis laporan Anda:</p>
+                    <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg gemini-output">
+                        ${marked(analysisResult)}
+                    </div>
+                `;
+                showModal('Laporan Diterima!', htmlContent, true);
+
+            } catch (error) {
+                console.error("Gemini API Error (Laporan):", error);
+                showModal('Laporan Diterima!', `Laporan ${jenis} Anda telah tersimpan. Namun, analisis AI gagal dimuat. Status: diproses.`);
+            } finally {
+                hideLoading();
+            }
+        }
+
+
+        function renderEdukasi() {
+            setActiveNav('nav-edukasi');
+            contentArea.innerHTML = `
+                <h2 class="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Edukasi Lingkungan untuk Semua</h2>
+                <div class="space-y-6">
+                    ${renderEdukasiCard('Daur Ulang 101', 'Pelajari cara memilah sampah organik dan anorganik dengan mudah di rumah. Kunci menuju lingkungan yang lebih bersih adalah pemilahan yang benar.', 'recycle', 'eco-main', 'Daur Ulang Sampah Rumah Tangga')}
+                    ${renderEdukasiCard('Ayo Tanam Pohon', 'Manfaat menanam pohon tidak hanya untuk udara bersih, tapi juga mengurangi risiko banjir dan mempercantik lingkungan Anda.', 'tree-deciduous', 'eco-dark', 'Manfaat Penanaman Pohon dan Langkah Menanam di Pekarangan')}
+                    ${renderEdukasiCard('Kompos Sederhana', 'Ubah sisa makanan menjadi pupuk kompos berkualitas tinggi. Panduan langkah demi langkah yang cepat dan hemat biaya.', 'shovel', '#f39c12', 'Pembuatan Kompos dari Limbah Dapur')}
+                    ${renderEdukasiCard('Hemat Air', 'Kiat praktis untuk menghemat penggunaan air sehari-hari, mulai dari kamar mandi hingga dapur. Air adalah kehidupan!', 'droplet', '#3498db', 'Cara Praktis Menghemat Air di Rumah')}
+                </div>
+                <div class="mt-8 p-6 bg-eco-light/20 dark:bg-gray-700 rounded-xl">
+                    <h3 class="font-bold text-lg text-eco-dark dark:text-eco-light">Bagikan Pengetahuan Ini!</h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-300">Setiap informasi kecil membawa perubahan besar. Sebarkan kesadaran!</p>
+                </div>
+            `;
+            lucide.createIcons();
+            // Attach event listeners for the new Gemini feature buttons
+            document.querySelectorAll('.btn-gemini-action').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const topic = e.currentTarget.dataset.topic;
+                    await suggestAction(topic);
+                });
+            });
+        }
+
+        // Fungsi baru untuk memicu Saran Aksi oleh Gemini
+        async function suggestAction(topic) {
+            showLoading();
+            const systemPrompt = "Anda adalah Asisten Inovasi Lingkungan AI. Tugas Anda adalah memberikan 3-5 ide aksi spesifik, terukur, dan praktis dalam bentuk daftar yang dapat segera dilakukan individu dalam 1-2 minggu ke depan, berdasarkan topik yang diberikan.";
+            const userPrompt = `Sarankan 3-5 aksi lingkungan spesifik untuk topik: "${topic}"`;
+
+            try {
+                const actionResult = await callGemini(userPrompt, systemPrompt);
+                
+                const htmlContent = `
+                    <h3 class="text-xl font-bold mb-3 text-eco-dark dark:text-eco-light">Saran Aksi Lingkungan ✨</h3>
+                    <p class="text-sm text-gray-700 dark:text-gray-300 mb-2">Berdasarkan topik <strong>"${topic}"</strong>, berikut ide yang bisa Anda lakukan:</p>
+                    <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg gemini-output">
+                        ${marked(actionResult)}
+                    </div>
+                `;
+                showModal('Aksi Cerdas Lingkungan', htmlContent, true);
+
+            } catch (error) {
+                console.error("Gemini API Error (Edukasi):", error);
+                showModal('Kesalahan', 'Gagal mendapatkan saran aksi. Coba lagi nanti.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+
+        function renderEdukasiCard(title, description, icon, color, geminiTopic) {
+            return `
+                <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-eco hover:shadow-lg transition duration-200 border-l-4" style="border-color: ${color};">
+                    <div class="flex items-start">
+                        <span data-lucide="${icon}" class="w-6 h-6 mr-3 mt-1" style="color: ${color};"></span>
+                        <div>
+                            <h3 class="font-semibold text-lg text-gray-900 dark:text-white">${title}</h3>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">${description}</p>
+                            <button data-topic="${geminiTopic}" class="btn-gemini-action text-sm font-medium mt-3 flex items-center bg-eco-light/50 dark:bg-eco-dark/50 text-eco-dark dark:text-white py-1 px-3 rounded-full hover:bg-eco-light transition duration-150">
+                                <span data-lucide="sparkles" class="w-4 h-4 mr-1"></span> Sarankan Aksi Lingkungan ✨
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAgenda() {
+            setActiveNav('nav-agenda');
+            const agendas = [
+                { tanggal: 'Sabtu, 20 Nov 2025', waktu: '08:00 WIB', lokasi: 'Taman Kota', kegiatan: 'Aksi Bersih Sampah Massal', relawan: 45, status: 'Aktif' },
+                { tanggal: 'Minggu, 28 Nov 2025', waktu: '14:00 WIB', lokasi: 'Sungai Ciliwung', kegiatan: 'Penanaman 1000 Bibit Pohon', relawan: 68, status: 'Aktif' },
+                { tanggal: 'Jum\'at, 03 Des 2025', waktu: '16:00 WIB', lokasi: 'Sekitar RT 05', kegiatan: 'Edukasi Daur Ulang & Kompos', relawan: 12, status: 'Baru' },
+            ];
+
+            contentArea.innerHTML = `
+                <h2 class="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Agenda Gotong Royong & Aksi Lingkungan</h2>
+                <div class="space-y-4" id="agenda-list">
+                    ${agendas.map(agenda => `
+                        <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border-l-4 border-eco-main hover:shadow-lg transition duration-200">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-xs font-bold uppercase text-eco-dark dark:text-eco-light">${agenda.tanggal} • ${agenda.waktu}</p>
+                                    <h3 class="font-bold text-xl text-gray-900 dark:text-white mt-1">${agenda.kegiatan}</h3>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400 flex items-center mt-2">
+                                        <span data-lucide="map-pin" class="w-4 h-4 mr-1"></span> ${agenda.lokasi}
+                                    </p>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400 flex items-center">
+                                        <span data-lucide="user-check" class="w-4 h-4 mr-1"></span> ${agenda.relawan} Relawan Terdaftar
+                                    </p>
+                                </div>
+                                <span class="text-xs font-semibold px-3 py-1 rounded-full bg-eco-main text-white">${agenda.status}</span>
+                            </div>
+                            <button class="mt-4 w-full text-center bg-eco-light/50 dark:bg-eco-dark/50 text-eco-dark dark:text-white py-2 rounded-lg font-semibold text-sm hover:bg-eco-light transition duration-150">
+                                Daftar Sekarang
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="mt-8 p-4 bg-yellow-100 dark:bg-yellow-900 rounded-xl border-l-4 border-yellow-500">
+                    <p class="text-sm text-yellow-800 dark:text-yellow-200 font-medium">Anda bisa mengajukan agenda baru melalui fitur komunitas (coming soon)!</p>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        async function renderRiwayat() {
+            setActiveNav('nav-riwayat');
+            contentArea.innerHTML = `
+                <h2 class="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Riwayat Laporan Anda</h2>
+                <div id="riwayat-list" class="space-y-4">
+                    <!-- Laporan akan di-load di sini -->
+                </div>
+                <div id="no-reports" class="hidden p-6 text-center bg-gray-100 dark:bg-gray-700 rounded-xl text-gray-500 dark:text-gray-400">
+                    <span data-lucide="inbox" class="w-8 h-8 mx-auto mb-2"></span>
+                    <p>Belum ada laporan yang Anda kirim. Ayo, mulai laporkan!</p>
+                </div>
+            `;
+            lucide.createIcons();
+            await loadReports();
+        }
+
+        async function loadReports() {
+            showLoading();
+            const riwayatList = document.getElementById('riwayat-list');
+            const noReports = document.getElementById('no-reports');
+            riwayatList.innerHTML = '';
+
+            try {
+                const reports = await getAllReports();
+                if (reports.length === 0) {
+                    noReports.classList.remove('hidden');
+                    return;
+                }
+                noReports.classList.add('hidden');
+
+                reports.reverse().forEach(report => { // Tampilkan yang terbaru di atas
+                    const statusColors = {
+                        'diproses': 'bg-yellow-500 text-white',
+                        'selesai': 'bg-eco-main text-white',
+                        'ditolak': 'bg-red-500 text-white',
+                        'menunggu': 'bg-gray-400 text-white' // Status default offline
+                    };
+
+                    const status = report.status || 'menunggu';
+                    const statusText = status.charAt(0).toUpperCase() + status.slice(1);
+                    const colorClass = statusColors[status.toLowerCase()] || statusColors['menunggu'];
+                    const date = new Date(report.timestamp).toLocaleDateString('id-ID', {
+                        day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                    });
+
+                    riwayatList.innerHTML += `
+                        <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border-l-4 border-eco-dark">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="text-xs font-semibold px-3 py-1 rounded-full ${colorClass}">${statusText}</span>
+                                    <h3 class="font-bold text-lg text-gray-900 dark:text-white mt-2">${report.jenis}</h3>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1 truncate">${report.deskripsi}</p>
+                                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-2">${date} (${report.lat ? 'Online' : 'Offline'})</p>
+                                </div>
+                                <span data-lucide="chevron-right" class="w-5 h-5 text-gray-400 mt-3"></span>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                showModal('Error', 'Gagal memuat riwayat laporan dari penyimpanan lokal.');
+                console.error(error);
+            } finally {
+                hideLoading();
+                lucide.createIcons();
+            }
+        }
+
+        // --- 3. Form Submission and Geolocation ---
+
+        function setupReportForm() {
+            const form = document.getElementById('reportForm');
+            const currentLocationSpan = document.getElementById('current-location');
+            let currentLat = null;
+            let currentLng = null;
+
+            // Dapatkan Lokasi Otomatis
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    currentLat = position.coords.latitude;
+                    currentLng = position.coords.longitude;
+                    currentLocationSpan.textContent = `Lat: ${currentLat.toFixed(4)}, Lng: ${currentLng.toFixed(4)}`;
+                }, error => {
+                    currentLocationSpan.textContent = 'Tidak dapat mendeteksi lokasi (Mode Offline)';
+                    console.warn('Geolocation error:', error);
+                }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+            } else {
+                currentLocationSpan.textContent = 'Geolocation tidak didukung.';
+            }
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                showLoading();
+
+                const jenis = document.getElementById('jenis').value;
+                const deskripsi = document.getElementById('deskripsi').value;
+                const fotoFile = document.getElementById('foto').files[0];
+
+                let fotoBase64 = null;
+                if (fotoFile) {
+                    // Konversi foto ke base64 agar bisa disimpan di IndexedDB
+                    fotoBase64 = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(fotoFile);
+                    });
+                }
+
+                const newReport = {
+                    jenis,
+                    deskripsi,
+                    foto: fotoBase64,
+                    lat: currentLat,
+                    lng: currentLng,
+                    timestamp: new Date().toISOString(),
+                    status: navigator.onLine ? 'diproses' : 'menunggu' // Tentukan status awal
+                };
+
+                try {
+                    await saveReportToDB(newReport);
+                    form.reset();
+                    currentLocationSpan.textContent = 'Laporan berhasil disimpan lokal!';
+                    
+                    // Panggil fitur Gemini untuk Analisis Laporan
+                    await analyzeAndShowReport(jenis, deskripsi);
+
+                } catch (error) {
+                    showModal('Gagal', 'Terjadi kesalahan saat menyimpan laporan.');
+                    console.error('Submit Error:', error);
+                    hideLoading(); // Pastikan loading hilang jika gagal sebelum AI dipanggil
+                } finally {
+                    updateMapMarkers(); // Update peta setelah laporan baru
+                }
+            });
+        }
+
+        // --- 4. Leaflet Map Integration ---
+
+        async function initMap() {
+            // Hapus instance map lama jika ada
+            if (map) {
+                map.remove();
+                map = null;
+            }
+
+            // Tetapkan koordinat default ke Jakarta (jika geolocation gagal)
+            const defaultLat = -6.2000;
+            const defaultLng = 106.8167;
+
+            map = L.map('map').setView([defaultLat, defaultLng], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            // Dapatkan lokasi pengguna (jika aktif) dan pindahkan tampilan peta
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const userLat = position.coords.latitude;
+                    const userLng = position.coords.longitude;
+                    map.setView([userLat, userLng], 15);
+                    L.marker([userLat, userLng]).addTo(map)
+                        .bindPopup('Lokasi Anda Saat Ini')
+                        .openPopup();
+                }, () => {
+                    console.log('Tidak dapat mendapatkan lokasi, menggunakan default.');
+                }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+            }
+
+            updateMapMarkers();
+        }
+
+        async function updateMapMarkers() {
+            if (!map) return;
+
+            // Hapus semua marker lama
+            map.eachLayer(layer => {
+                if (layer instanceof L.Marker) {
+                    map.removeLayer(layer);
+                }
+            });
+
+            try {
+                const reports = await getAllReports();
+                reports.forEach(report => {
+                    if (report.lat && report.lng) {
+                        const marker = L.marker([report.lat, report.lng]).addTo(map);
+                        const popupContent = `
+                            <strong>${report.jenis}</strong><br>
+                            ${report.deskripsi}<br>
+                            Status: <span class="font-bold text-eco-dark">${report.status}</span>
+                        `;
+                        marker.bindPopup(popupContent);
+                    }
+                });
+            } catch (e) {
+                console.error('Gagal menampilkan marker laporan:', e);
+            }
+        }
+
+        // --- 5. Mode Gelap (Dark Mode) ---
+
+        function setupDarkMode() {
+            const toggle = document.getElementById('darkModeToggle');
+            const isDark = localStorage.getItem('darkMode') === 'true';
+
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+                toggle.innerHTML = `<span data-lucide="sun" class="w-6 h-6 text-yellow-400"></span>`;
+            } else {
+                 document.documentElement.classList.remove('dark');
+                 toggle.innerHTML = `<span data-lucide="moon" class="w-6 h-6 text-gray-900 dark:text-yellow-400"></span>`;
+            }
+
+            toggle.addEventListener('click', () => {
+                if (document.documentElement.classList.contains('dark')) {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('darkMode', 'false');
+                    toggle.innerHTML = `<span data-lucide="moon" class="w-6 h-6 text-gray-900 dark:text-yellow-400"></span>`;
+                } else {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('darkMode', 'true');
+                    toggle.innerHTML = `<span data-lucide="sun" class="w-6 h-6 text-yellow-400"></span>`;
+                }
+                lucide.createIcons(); // Update icons after toggle
+            });
+        }
+
+        // --- 6. Markdown Parser (Sangat sederhana, hanya untuk baris baru) ---
+        // Karena Gemini menghasilkan Markdown, kita perlu parser sederhana untuk modal.
+        function marked(markdownText) {
+            // Ganti baris baru Markdown (\n) dengan tag HTML <br>
+            let html = markdownText.replace(/\\n/g, '<br>');
+            // Mengubah **teks** menjadi <strong>teks</strong>
+            html = html.replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>');
+            // Mengubah *teks* atau _teks_ menjadi <em>teks</em>
+            html = html.replace(/(\\*|_)(.*?)\1/g, '<em>$2</em>');
+            // Mengubah list item
+            html = html.replace(/^(\s*)-\s(.+)/gm, '<li>$2</li>');
+            html = html.replace(/(<li>.*<br>)+/g, '<ul>$&</ul>').replace(/<br><\/ul>/g, '</ul>');
+            return html;
+        }
+
+
+        // --- 7. Inisialisasi Aplikasi ---
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            lucide.createIcons();
+            setupDarkMode();
+            await initIndexedDB();
+
+            // Setup Navigasi
+            document.getElementById('nav-lapor').addEventListener('click', renderLaporCepat);
+            document.getElementById('nav-edukasi').addEventListener('click', renderEdukasi);
+            document.getElementById('nav-agenda').addEventListener('click', renderAgenda);
+            document.getElementById('nav-riwayat').addEventListener('click', renderRiwayat);
+
+            // Default view
+            renderLaporCepat();
+        });
+        
+    </script>
+</body>
+</html>
